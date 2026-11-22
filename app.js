@@ -6,7 +6,8 @@ let STATE = {
   chFilter: "ALL",
   chSort: "views_28d",
   chQuery: "",
-  abFilter: "ALL"
+  abFilter: "ALL",
+  learnFilter: "ALL"
 };
 
 const $ = (id) => document.getElementById(id);
@@ -201,6 +202,11 @@ function renderOverview() {
   const ramText = mh.ram_trong !== undefined ? `${mh.ram_trong}/${mh.ram_tong} GB trống` : "Chưa đo";
   const cpuText = mh.cpu !== undefined ? `CPU ${mh.cpu}%` : "";
   const diskText = mh.o_c !== undefined ? `C: ${mh.o_c}GB • E: ${mh.o_e}GB` : "";
+  const learn = d.learning || {};
+  const ls = learn.stats || {};
+  const latestLessons = (learn.entries || []).slice(0, 2);
+  const accText = ls.accuracy_pct !== null && ls.accuracy_pct !== undefined ? `${String(ls.accuracy_pct).replace(".", ",")}%` : "—";
+  const nextLabel = ls.next_checkpoint ? `${ls.next_checkpoint.slice(8, 10)}/${ls.next_checkpoint.slice(5, 7)} (${ls.ab_total || 0} video)` : "—";
 
   $("tab-overview").innerHTML = `
     <div class="kpi-grid tabular">
@@ -302,6 +308,34 @@ function renderOverview() {
           ? `<div class="row-desc" style="color:#FBBF24;margin-top:6px">Đang chạy: ${esc(Object.keys(mh.viec).join(", "))}</div>`
           : `<div class="row-desc" style="margin-top:6px">Không có tác vụ render/Whisper nặng đang chạy.</div>`
       }
+    </div>
+
+    <div class="card">
+      <div class="card-title-row">
+        <h3 class="card-title">Tiến hoá &amp; Sổ học AI</h3>
+        <span class="health-pill pill-info tabular">Đúng ${esc(accText)}</span>
+      </div>
+      <div class="row-desc tabular" style="margin-top:0;color:#E2E8F0">
+        Đã chấm: <strong>${ls.correct || 0}</strong> đúng / <strong>${ls.wrong || 0}</strong> sai • Chờ đo: <strong>${ls.pending || 0}</strong> • Mốc kế: <strong>${esc(nextLabel)}</strong>
+      </div>
+      <div class="list-stack" style="margin-top:10px">
+        ${latestLessons
+          .map(
+            (item) => `
+            <div class="comment-card" style="padding:9px 11px">
+              <div class="row-head">
+                <span class="code-tag">${esc(item.kenh)}</span>
+                <span class="health-pill ${item.danh_gia === "ĐÚNG" ? "pill-ok" : item.danh_gia === "SAI" ? "pill-bad" : "pill-info"}">${esc(item.danh_gia)}</span>
+                <span class="card-sub tabular">${esc(item.ngay_quyet)}</span>
+              </div>
+              <div class="row-desc" style="color:#E2E8F0;margin-top:4px">${esc(item.bai_hoc_luat)}</div>
+            </div>`
+          )
+          .join("")}
+      </div>
+      <button type="button" class="row-item" data-jump-tab="schedule" style="margin-top:10px;justify-content:center;font-weight:700;color:#34D399">
+        Mở toàn bộ Sổ học (${ls.total || 0} quyết định) →
+      </button>
     </div>
   `;
 }
@@ -523,6 +557,14 @@ function renderScheduleAndAb() {
     if (STATE.abFilter === "OLD") return r.bucket !== "SCHED";
     return true;
   });
+  const learn = d.learning || {};
+  const ls = learn.stats || {};
+  const learnAll = learn.entries || [];
+  const learnRows = learnAll.filter((e) => {
+    if (STATE.learnFilter === "ALL") return true;
+    return (e.danh_gia || "").toUpperCase() === STATE.learnFilter;
+  });
+  const accText = ls.accuracy_pct !== null && ls.accuracy_pct !== undefined ? `${String(ls.accuracy_pct).replace(".", ",")}%` : "—";
 
   $("tab-schedule").innerHTML = `
     <div class="card">
@@ -580,6 +622,40 @@ function renderScheduleAndAb() {
       </div>
       <div class="row-desc" style="margin-top:10px">
         Đang chờ đủ 30 ngày cooldown: TH V01 v3 (08/12), NR Sahara v2 (14/12).
+      </div>
+    </div>
+
+    <div class="card" id="learning-card">
+      <div class="card-title-row">
+        <h3 class="card-title">Sổ học quyết định &amp; Luật mới</h3>
+        <span class="health-pill pill-info tabular">${ls.correct || 0}/${ls.graded || 0} đúng (${esc(accText)})</span>
+      </div>
+      <div class="chip-scroll" style="margin-bottom:10px">
+        <button type="button" class="chip ${STATE.learnFilter === "ALL" ? "active" : ""}" data-learn-filter="ALL">Tất cả (${learnAll.length})</button>
+        <button type="button" class="chip ${STATE.learnFilter === "ĐÚNG" ? "active" : ""}" data-learn-filter="ĐÚNG">Đúng (${ls.correct || 0})</button>
+        <button type="button" class="chip ${STATE.learnFilter === "SAI" ? "active" : ""}" data-learn-filter="SAI">Sai (${ls.wrong || 0})</button>
+        <button type="button" class="chip ${STATE.learnFilter === "CHỜ ĐO" ? "active" : ""}" data-learn-filter="CHỜ ĐO">Chờ đo (${ls.pending || 0})</button>
+      </div>
+      <div class="list-stack">
+        ${
+          learnRows.length
+            ? learnRows
+                .map(
+                  (item) => `
+                  <div class="comment-card learning-card" style="padding:11px 12px">
+                    <div class="row-head">
+                      <span class="code-tag">${esc(item.kenh)}</span>
+                      <span class="health-pill ${item.danh_gia === "ĐÚNG" ? "pill-ok" : item.danh_gia === "SAI" ? "pill-bad" : "pill-info"}">${esc(item.danh_gia)}</span>
+                      <span class="card-sub tabular">${esc(item.ngay_quyet)} • ${esc(item.pham_vi)}</span>
+                    </div>
+                    <div class="row-desc" style="color:#E2E8F0;margin-top:5px"><strong>Giả thuyết:</strong> ${esc(item.gia_thuyet)}</div>
+                    <div class="row-desc" style="margin-top:3px"><strong>Đo thực tế:</strong> ${esc(item.ket_qua_do)}</div>
+                    <div class="row-desc" style="color:#6EE7B7;margin-top:4px"><strong>Luật rút ra:</strong> ${esc(item.bai_hoc_luat)}</div>
+                  </div>`
+                )
+                .join("")
+            : `<div class="empty-box">Chưa có quyết định ở trạng thái này.</div>`
+        }
       </div>
     </div>
   `;
@@ -795,6 +871,20 @@ async function init() {
     if (abChip) {
       STATE.abFilter = abChip.dataset.abFilter;
       renderScheduleAndAb();
+      return;
+    }
+    const learnChip = e.target.closest("[data-learn-filter]");
+    if (learnChip) {
+      STATE.learnFilter = learnChip.dataset.learnFilter;
+      renderScheduleAndAb();
+      return;
+    }
+    const jumpBtn = e.target.closest("[data-jump-tab]");
+    if (jumpBtn) {
+      switchTab(jumpBtn.dataset.jumpTab);
+      if (jumpBtn.dataset.jumpTab === "schedule") {
+        setTimeout(() => document.getElementById("learning-card")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+      }
     }
   });
 
