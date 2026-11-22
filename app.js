@@ -559,12 +559,24 @@ function renderScheduleAndAb() {
   });
   const learn = d.learning || {};
   const ls = learn.stats || {};
+  const weakEval = learn.weak_channels_eval || [];
   const learnAll = learn.entries || [];
   const learnRows = learnAll.filter((e) => {
     if (STATE.learnFilter === "ALL") return true;
     return (e.danh_gia || "").toUpperCase() === STATE.learnFilter;
   });
   const accText = ls.accuracy_pct !== null && ls.accuracy_pct !== undefined ? `${String(ls.accuracy_pct).replace(".", ",")}%` : "—";
+  const fmtDeltaPp = (v) => {
+    if (v === null || v === undefined) return "—";
+    const s = v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1);
+    return `${s.replace(".", ",")} pp`;
+  };
+  const sigBadge = (sig) => {
+    if (sig === "ĐANG TĂNG" || sig === "ĐẠT") return "pill-ok";
+    if (sig === "CHƯA LÊN SÓNG") return "pill-muted";
+    if (sig === "CHƯA ĐẠT") return "pill-bad";
+    return "pill-info";
+  };
 
   $("tab-schedule").innerHTML = `
     <div class="card">
@@ -594,8 +606,32 @@ function renderScheduleAndAb() {
 
     <div class="card">
       <div class="card-title-row">
-        <h3 class="card-title">Theo dõi đợt đổi CTR 22/11 (23 video)</h3>
-        <span class="health-pill pill-info">Soi lại 29/11</span>
+        <h3 class="card-title">Hiệu quả đổi CTR 6 kênh yếu</h3>
+        <span class="health-pill pill-info tabular">22/11 → ${esc(d.snapshot_date_vi)}</span>
+      </div>
+      <div id="weak-ctr-grid" class="kpi-grid tabular" style="margin-bottom:12px">
+        ${weakEval
+          .map((w) => {
+            const dCls =
+              w.delta_ctr_7d_pp > 0 ? "pill-ok" : w.delta_ctr_7d_pp < 0 ? "pill-bad" : "pill-muted";
+            return `
+              <button type="button" class="kpi-card weak-ctr-card" data-open-ma="${esc(w.ma)}" style="text-align:left;cursor:pointer">
+                <div class="row-head" style="justify-content:space-between">
+                  <span class="code-tag">${esc(w.ma)}</span>
+                  <span class="health-pill ${dCls}">${esc(fmtDeltaPp(w.delta_ctr_7d_pp))}</span>
+                </div>
+                <div class="kpi-val" style="font-size:17px;margin-top:6px">${esc(w.base_ctr_7d)} → ${esc(w.cur_ctr_7d)}</div>
+                <div class="kpi-foot" style="display:block;margin-top:4px">
+                  Imp 7N: ${fmtNum(w.base_imp_7d)} → ${fmtNum(w.cur_imp_7d)} • 48h: ${fmtNum(w.views_48h)}
+                </div>
+              </button>`;
+          })
+          .join("")}
+      </div>
+
+      <div class="card-title-row" style="margin-top:4px">
+        <h3 class="card-title">23 video đổi 22/11 (Trước → Sau)</h3>
+        <span class="health-pill pill-info">Chốt T+7: 29/11</span>
       </div>
       <div class="chip-scroll" style="margin-bottom:10px">
         <button type="button" class="chip ${STATE.abFilter === "ALL" ? "active" : ""}" data-ab-filter="ALL">Tất cả (${abRowsAll.length})</button>
@@ -604,20 +640,36 @@ function renderScheduleAndAb() {
       </div>
       <div class="list-stack">
         ${abRows
-          .map(
-            (r) => `
+          .map((r) => {
+            const baseLine =
+              r.bucket === "SCHED" && !r.imp_28d && !r.imp_7d
+                ? "Video sắp lên sóng (chưa có nền trước 22/11)"
+                : `28N: ${esc(r.imp_28d || "—")} imp / ${esc(r.ctr_28d || "—")} • 7N: ${esc(r.imp_7d || "—")} imp / ${esc(r.ctr_7d || "—")}`;
+            const curLine =
+              r.live_signal === "CHƯA LÊN SÓNG"
+                ? "Chưa lên sóng trên Studio"
+                : `${fmtNum(r.cur_imp_7d)} imp / ${esc(r.cur_ctr_7d || "—")} (7N) • ${fmtNum(r.cur_views_7d)} xem • AVD ${esc(r.cur_avd_7d || "—")}`;
+            const deltaTag =
+              r.delta_ctr_7d_pp !== null && r.delta_ctr_7d_pp !== undefined
+                ? fmtDeltaPp(r.delta_ctr_7d_pp)
+                : r.live_signal || "THEO DÕI";
+            return `
             <div class="comment-card">
               <div class="row-head">
                 <span class="code-tag">${esc(r.ma)}</span>
                 <span class="health-pill ${r.bucket === "SCHED" ? "pill-info" : "pill-warn"}">${esc(r.bucket)}</span>
+                <span class="health-pill ${sigBadge(r.live_signal)}">${esc(deltaTag)}</span>
                 <span class="row-name">${esc(r.ten_tap)}</span>
               </div>
               <div class="row-desc" style="color:#E2E8F0;margin-top:5px">${esc(r.tieu_de_moi)}</div>
-              <div class="row-desc tabular">
-                Nền 28N: ${esc(r.imp_28d || "—")} imp / ${esc(r.ctr_28d || "—")} • 7N: ${esc(r.imp_7d || "—")} imp / ${esc(r.ctr_7d || "—")} • Thumb: ${esc(r.thumb_moi)}
+              <div class="row-desc tabular" style="margin-top:4px">
+                <strong>Trước (22/11):</strong> ${baseLine}
               </div>
-            </div>`
-          )
+              <div class="row-desc tabular" style="color:#7DD3FC;margin-top:2px">
+                <strong>Hiện tại (${esc(d.snapshot_date_vi)}):</strong> ${curLine} • Thumb: ${esc(r.thumb_moi)}
+              </div>
+            </div>`;
+          })
           .join("")}
       </div>
       <div class="row-desc" style="margin-top:10px">
