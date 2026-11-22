@@ -1,4 +1,4 @@
-const CACHE_NAME = "dc23-studio-v1";
+const CACHE_NAME = "dc23-studio-v2";
 const SHELL_ASSETS = [
   "./",
   "./index.html",

@@ -169,7 +169,10 @@ function renderHeader() {
   }
 
   const urgentSched = (d.channels || []).filter(
-    (c) => c.status_code !== "bo" && (c.sched_count === 0 || (c.sched_days_left !== null && c.sched_days_left < 7))
+    (c) =>
+      c.status_code !== "bo" &&
+      c.status_code !== "DUNG-SX" &&
+      (c.sched_count === 0 || (c.sched_days_left !== null && c.sched_days_left < 7))
   ).length;
   const badgeS = $("badge-schedule");
   if (urgentSched > 0) {
