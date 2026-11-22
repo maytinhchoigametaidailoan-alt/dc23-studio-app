@@ -2,8 +2,8 @@ const CACHE_NAME = "dc23-studio-v2";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
+  "./styles.css?v=2",
+  "./app.js?v=2",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
